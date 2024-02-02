@@ -76,54 +76,82 @@ def table_de_verite(n):
 def FindSol(table,combi):
     model = ConcreteModel()
 
+    # Indices
+    
+    model.I = RangeSet(1, n)
+    model.J = RangeSet(1, 2*n)
+
     # Variables
-    #model.r2 = Var(within=PositiveReals,initialize=1.0)
-    model.r2 = Var(bounds=(0.05,10**5),initialize=1.0)
-    model.x2 = Var(within=Reals)
-    model.y2 = Var(within=Reals)
+    #dans l'ordre pour chaque cercle
+    model.rayons = Var(model.I,bounds=(0.05,10**5),initialize=1.0)
+    model.coos = Var(model.J,within=Reals)
     model.d= Var(within=NonNegativeIntegers)
+
+    #Cercle fixe
+    model.rayons[1] = 1
+    model.coos[1] = 0
+    model.coos[2] = 0
 
     # Objective Function
     #Rapprocher les centres de 0,0
-    #model.obj = Objective(expr=model.x2**2 + model.y2**2)
+    #model.obj = Objective(expr=model.coos[3]**2 + model.coos[4]**2)
     #Rayons proches de la moyenne
-    #model.obj = Objective(expr=(sum([1,model.r2])/2 - rayon_moyen)**2)
+    #model.obj = Objective(expr=(sum([1,model.rayons[2]])/2 - rayon_moyen)**2)
     #Distance entre cercle proche de la moyenne
     #model.obj = Objective(expr=model.d)
     #Distance et rayon proche de la moyenne
-    model.obj = Objective(expr= (sum([1,model.r2])/2 - rayon_moyen)**2 + model.d)
+    model.obj = Objective(expr= (sum([1,model.rayons[2]])/2 - rayon_moyen)**2 + model.d)
 
     # Equations du système :
     model.system=ConstraintList()
-    model.system.add(expr=model.d == sum([model.x2**2 + model.y2**2])/2 - distance_moyenne)
+    #Contrainte de distance moyenne qui sert pour l'objectif
+    model.system.add(expr=model.d == sum([model.coos[3]**2 + model.coos[4]**2])/2 - distance_moyenne)
+
+    #Définir la situation pour chaque paire de cercle
+    #solo : si un cercle est présent seul, intersec : si les deux cercles sont en intersection
+    solo1=True
+    solo2=True
+    intersec=True
+    for ligne in range(2**n):
+        if table[ligne,0] == 1 and table[ligne,1] == 0 and combi[ligne] == "0":
+            solo1=False
+        elif table[ligne,0] == 0 and table[ligne,1] == 1 and combi[ligne] == "0":
+            solo2=False
+        elif table[ligne,0] == 1 and table[ligne,1] == 1 and combi[ligne] == "0":
+            intersec=False
+
+
+
     #cas 1
-    if cas==1:
-        model.system.add(expr=1.1*(1 + 2*model.r2 + model.r2**2) <= model.x2**2 + model.y2**2)
+    if solo1 and solo2 and not intersec:
+        model.system.add(expr=1.1*(1 + 2*model.rayons[2] + model.rayons[2]**2) <= model.coos[3]**2 + model.coos[4]**2)
     #cas 2
-    elif cas == 2:
-        model.system.add(expr=1 + 2*model.r2 + model.r2**2 >= model.x2**2 + model.y2**2)
-        model.system.add(expr=model.r2 <= 1)
-        model.system.add(expr=1 - 2*model.r2 + model.r2**2 >= model.x2**2 + model.y2**2)
+    elif not (solo1 and solo2) and intersec:
+        model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
+        model.system.add(expr=model.rayons[2] <= 1)
+        model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
     #cas 3
+    elif solo1 and solo2 and intersec:
+        model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
+        model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 <= model.coos[3]**2 + model.coos[4]**2)
     else:
-        model.system.add(expr=1 + 2*model.r2 + model.r2**2 >= model.x2**2 + model.y2**2)
-        model.system.add(expr=1 - 2*model.r2 + model.r2**2 <= model.x2**2 + model.y2**2)
+        print("Erreur pas de cas trouvé")
 
 
     # Solve the model
-    sol = SolverFactory('gurobi').solve(model, tee=True, options={"NonConvex":2})
+    sol = SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
 
     # CHECK SOLUTION STATUS
 
     # Get a JSON representation of the solution
-    sol_json = sol.json_repn()
+    # sol_json = sol.json_repn()
     # Check solution status
     # if sol_json['Solver'][0]['Status'] != 'ok':
     #     return None
     # if sol_json['Solver'][0]['Termination condition'] != 'optimal':
     #     return None
 
-    return [Cercle(model.r2(),model.x2(),model.y2())]
+    return Cercle(model.rayons[2](),model.coos[3](),model.coos[4]())
 
 
 #il faut retirer les symétries et situations impossibles
@@ -193,35 +221,38 @@ print(len(combinaisons), combinaisons)
 solutions=[]
 for combi in combinaisons:
     solutions.append(FindSol(table,combi))
+for cercle in solutions:
+    cercle.valeurs()
+
+def affichage_suivant():
+    global numero
+    Canevas.delete(ALL)
+    cercles=[solutions[numero]]
+    cercles.append(Cercle(1,0,0))
+    numero+=1
+
+    for cercle in cercles:
+        #print(cercle.valeurs())
+        Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite)
+        Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite)
 
 
+fenetre=Tk()
+#fenetre.attributes('-fullscreen', True)
+fenetre.bind('<Escape>',lambda e: fenetre.destroy())
 
+Canevas = Canvas(fenetre, width=width, height=height)
+Canevas.pack()
 
-# cercles=FindSol()
-# cercles.append(Cercle(1,0,0))
+Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
+Bouton1.pack()
 
+Bouton_affiche = Button(fenetre, text = 'Suivant', command = affichage_suivant)
+Bouton_affiche.pack()
 
+numero=0
 
-# fenetre=Tk()
-# #fenetre.attributes('-fullscreen', True)
-# fenetre.bind('<Escape>',lambda e: fenetre.destroy())
+affichage_suivant()
 
-# Canevas = Canvas(fenetre, width=width, height=height)
-# Canevas.pack()
-
-# Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
-# Bouton1.pack()
-
-
-
-
-# for cercle in cercles:
-#     print(cercle.valeurs())
-#     Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite)
-#     Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite)
-
-
-
-
-# fenetre.mainloop()
+fenetre.mainloop()
 
