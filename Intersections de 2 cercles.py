@@ -32,7 +32,6 @@ y0=height//2
 rayon_moyen=0.8
 distance_moyenne=0.2
 
-cas=3
 n=2
 
 def FindSol(table,combi):
@@ -84,15 +83,15 @@ def FindSol(table,combi):
 
 
 
-    #cas 1
+    #séparés
     if solo1 and solo2 and not intersec:
         model.system.add(expr=1.1*(1 + 2*model.rayons[2] + model.rayons[2]**2) <= model.coos[3]**2 + model.coos[4]**2)
-    #cas 2
+    #imbriqués (intersection également)
     elif not (solo1 and solo2) and intersec:
         model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
         model.system.add(expr=model.rayons[2] <= 1)
         model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
-    #cas 3
+    #intersection simple
     elif solo1 and solo2 and intersec:
         model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
         model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 <= model.coos[3]**2 + model.coos[4]**2)
@@ -100,7 +99,7 @@ def FindSol(table,combi):
         print("Erreur pas de cas trouvé")
 
     # Solve the model
-    sol = SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
+    SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
 
     return Cercle(model.rayons[2](),model.coos[3](),model.coos[4]())
 
