@@ -5,7 +5,7 @@ Il y a donc 2^n lignes.
 Cette table montre toutes les intersections possibles.
 Pour obtenir toutes les combinaisons d'intersection possible il faut valider ou invalider chaque ligne,
 il y a donc 2^(2^n) combinaisons possibles.
-Il faut ensuite (ou avant ?) supprimer les symmétriques.
+Il faut ensuite supprimer les symmétriques.
 
 On peut maintenant créer les contraintes pour résoudre en LP.
 Inconnues : coordonnées des centres des cercles et leur rayon.
@@ -16,14 +16,12 @@ Jamais 3 cercles qui se touchent :
 ||C1-C2|| != r1 + r2
 ||C1-C3|| != r1 + r3
 ||C3-C2|| != r3 + r2
-
-
 """
 
 from pyomo.environ import ConcreteModel, Var, Objective, Constraint, ConstraintList, SolverFactory
-from pyomo.environ import Reals, PositiveReals, RangeSet, NonNegativeIntegers
+from pyomo.environ import Reals, RangeSet, NonNegativeIntegers
 from tkinter import *
-import numpy as np
+from Fonctions import *
 
 width=500
 height=width
@@ -36,42 +34,6 @@ distance_moyenne=0.2
 
 cas=3
 n=2
-
-class Cercle:
-    def __init__(self,r,x,y):
-        self.r=r
-        self.x=x
-        self.y=y
-    def valeurs(self):
-        print(round(self.r,2),round(self.x,2),round(self.y,2))
-
-#décimal à binaire
-def dectobi(a):
-    t,b="1",0
-    while 2**(b+1)<=a:
-        b+=1
-    a-=2**b
-    for i in range(b-1,-1,-1):
-        if a-2**i<0:
-            t+="0"
-        else:
-            t+="1"
-            a-=2**i
-    return t
-
-def table_de_verite(n):
-    table=np.zeros((2**n,n))
-    for dec in range(1,2**n):
-        binaire=dectobi(dec)
-        binaire="0"*(n-len(binaire)) + binaire
-        for i in range(len(binaire)):
-            if binaire[i]=="0":
-                table[dec,i]=0
-            else:
-                table[dec,i]=1
-    return table
-#print(table_de_verite(3))
-
 
 def FindSol(table,combi):
     model = ConcreteModel()
@@ -137,19 +99,8 @@ def FindSol(table,combi):
     else:
         print("Erreur pas de cas trouvé")
 
-
     # Solve the model
     sol = SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
-
-    # CHECK SOLUTION STATUS
-
-    # Get a JSON representation of the solution
-    # sol_json = sol.json_repn()
-    # Check solution status
-    # if sol_json['Solver'][0]['Status'] != 'ok':
-    #     return None
-    # if sol_json['Solver'][0]['Termination condition'] != 'optimal':
-    #     return None
 
     return Cercle(model.rayons[2](),model.coos[3](),model.coos[4]())
 
@@ -238,7 +189,6 @@ def affichage_suivant():
 
 
 fenetre=Tk()
-#fenetre.attributes('-fullscreen', True)
 fenetre.bind('<Escape>',lambda e: fenetre.destroy())
 
 Canevas = Canvas(fenetre, width=width, height=height)
