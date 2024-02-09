@@ -32,7 +32,7 @@ y0=height//2
 rayon_moyen=0.8
 distance_moyenne=0.2
 
-n=2
+n=3
 
 def FindSol(table,combi):
     model = ConcreteModel()
@@ -97,40 +97,50 @@ def FindSol(table,combi):
         print("Erreur pas de cas trouvé")
 
     # Solve the model
-    sol = SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
+    SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
 
     return Cercle(model.rayons[2](),model.coos[3](),model.coos[4]())
 
-
+"""
+#je commente ça car je ne trouve pas toutes les règles pour réduire les combinaisons (actuellement 28 au lieu de 14)
 #il faut retirer les symétries et situations impossibles
 table=table_de_verite(n)
 print(table)
+
 combinaisons=[]
 for i in range(2**(2**n)):
     binaire=dectobi(i)
     #pas d'espace vide est impossible
     if len(binaire) < 2**n:
         continue
-    #aucun cercle seul existant : impossible, il y en a au moins un
+    #aucune portion de cercle seule existante : impossible, il y en a au moins une
     non_existant=0
     for ligne in range(2**n):
         if sum(table[ligne,colonne] for colonne in range(n)) == 1 and binaire[ligne] == "0":
             non_existant+=1
     if non_existant == n:
         continue
-    #si un cercle n'existe pas il doit être dans (= en intersection entière) avec un autre cercle
+    #si un cercle n'existe pas seul il doit être dans (= en intersection entière) avec un autre cercle
     continuer=False
     for ligne in range(2**n):
         if sum(table[ligne,colonne] for colonne in range(n)) == 1 and binaire[ligne] == "0":
             indice=[table[ligne,colonne] for colonne in range(n)].index(1)
             intersection=False
             for l in range(2**n):
-                if sum(table[l,colonne] for colonne in range(n)) >=2 and table[ligne,indice] == 1 and binaire[l] == "1":
+                if sum(table[l,colonne] for colonne in range(n)) >=2 and table[l,indice] == 1 and binaire[l] == "1":
                     intersection=True
                     break
             if not intersection:
                 continuer=True
                 break
+    if continuer:
+        continue
+    #si deux cercles ne sont pas intersection il ne peut pas y avoir une triple intersection : faux
+    for ligne in range(2**n):
+        if sum(table[ligne,colonne] for colonne in range(n)) == 2 and binaire[ligne] == "0" and binaire[-1] == "1":
+            continuer=True
+            break
+            
     if continuer:
         continue
     #print(binaire)
@@ -139,67 +149,73 @@ for i in range(2**(2**n)):
 
 #symétrie : échanger deux colonnes, réordonner les lignes, comparer le binaire des intersections,
 #s'il est déjà présent c'est une symétrie
-#actuellement que pour le cas n=2
-inverse=(0,1)
-newTable=table_de_verite(n)
-for i in range(2**n):
-    newTable[i,inverse[0]] = table[i,inverse[1]]
-    newTable[i,inverse[1]] = table[i,inverse[0]]
-#print(newTable)
+permutations=[(1,0,2),(2,1,0),(0,2,1)] + [(2,0,1),(1,2,0)]
 for binaire in combinaisons:
-    tri=[]
-    for i in range(2**n):
-        ligne=""
-        for j in range(n):
-            ligne+=str(int(newTable[i,j]))
-        tri.append((ligne,binaire[i]))
-    tri.sort()
-    #print(tri)
-    binaire_tri=""
-    for i in tri:
-        binaire_tri+=i[1]
-    #print(binaire_tri)
-    
-    if binaire!=binaire_tri and binaire_tri in combinaisons and binaire in combinaisons:
-        combinaisons.remove(binaire_tri)
+    for permut in permutations:
+        newTable=table_de_verite(n)
+        #échange de 2 colonnes
+        for i in range(2**n):
+            newTable[i,0] = table[i,permut[0]]
+            newTable[i,1] = table[i,permut[1]]
+            newTable[i,2] = table[i,permut[2]]
+        #print(newTable)
+        #tri par ordre croissant des lignes
+        tri=[]
+        for i in range(2**n):
+            ligne=""
+            for j in range(n):
+                ligne+=str(int(newTable[i,j]))
+            tri.append((ligne,binaire[i]))
+        tri.sort()
+        #print(tri)
+        #nouveau code binaire
+        binaire_tri=""
+        for i in tri:
+            binaire_tri+=i[1]
+        #print(binaire_tri)
+        
+        if binaire!=binaire_tri and binaire_tri in combinaisons:
+            combinaisons.remove(binaire_tri)
 
-print(len(combinaisons), combinaisons)
+print(len(combinaisons), *combinaisons)
+for i in combinaisons:
+    print(i) """
+combinaisons=["11101000","11111010","11100010","10001011","10001110","10011111","11111000","11111111","11111110","11110010","11110011","11110001","11110111","11101111"]
+
+# solutions=[]
+# for combi in combinaisons:
+#     solutions.append(FindSol(table,combi))
+# for cercle in solutions:
+#     cercle.valeurs()
+
+# def affichage_suivant():
+#     global numero
+#     Canevas.delete(ALL)
+#     cercles=[solutions[numero]]
+#     cercles.append(Cercle(1,0,0))
+#     numero+=1
+
+#     for cercle in cercles:
+#         #print(cercle.valeurs())
+#         Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite)
+#         Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite)
 
 
-solutions=[]
-for combi in combinaisons:
-    solutions.append(FindSol(table,combi))
-for cercle in solutions:
-    cercle.valeurs()
+# fenetre=Tk()
+# fenetre.bind('<Escape>',lambda e: fenetre.destroy())
 
-def affichage_suivant():
-    global numero
-    Canevas.delete(ALL)
-    cercles=[solutions[numero]]
-    cercles.append(Cercle(1,0,0))
-    numero+=1
+# Canevas = Canvas(fenetre, width=width, height=height)
+# Canevas.pack()
 
-    for cercle in cercles:
-        #print(cercle.valeurs())
-        Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite)
-        Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite)
+# Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
+# Bouton1.pack()
 
+# Bouton_affiche = Button(fenetre, text = 'Suivant', command = affichage_suivant)
+# Bouton_affiche.pack()
 
-fenetre=Tk()
-fenetre.bind('<Escape>',lambda e: fenetre.destroy())
+# numero=0
 
-Canevas = Canvas(fenetre, width=width, height=height)
-Canevas.pack()
+# affichage_suivant()
 
-Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
-Bouton1.pack()
-
-Bouton_affiche = Button(fenetre, text = 'Suivant', command = affichage_suivant)
-Bouton_affiche.pack()
-
-numero=0
-
-affichage_suivant()
-
-fenetre.mainloop()
+# fenetre.mainloop()
 
