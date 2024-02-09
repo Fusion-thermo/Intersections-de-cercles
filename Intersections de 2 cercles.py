@@ -127,7 +127,7 @@ for i in range(2**(2**n)):
             indice=[table[ligne,colonne] for colonne in range(n)].index(1)
             intersection=False
             for l in range(2**n):
-                if sum(table[l,colonne] for colonne in range(n)) >=2 and table[ligne,indice] == 1 and binaire[l] == "1":
+                if sum(table[l,colonne] for colonne in range(n)) >=2 and table[l,indice] == 1 and binaire[l] == "1":
                     intersection=True
                     break
             if not intersection:
@@ -141,7 +141,7 @@ for i in range(2**(2**n)):
 
 #symétrie : échanger deux colonnes, réordonner les lignes, comparer le binaire des intersections,
 #s'il est déjà présent c'est une symétrie
-#actuellement que pour le cas n=2
+#ici que pour le cas n=2
 inverse=(0,1)
 newTable=table_de_verite(n)
 for i in range(2**n):
@@ -162,7 +162,7 @@ for binaire in combinaisons:
         binaire_tri+=i[1]
     #print(binaire_tri)
     
-    if binaire!=binaire_tri and binaire_tri in combinaisons and binaire in combinaisons:
+    if binaire!=binaire_tri and binaire_tri in combinaisons:
         combinaisons.remove(binaire_tri)
 
 print(len(combinaisons), combinaisons)

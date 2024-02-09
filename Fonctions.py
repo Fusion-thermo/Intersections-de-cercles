@@ -28,9 +28,7 @@ def table_de_verite(n):
         binaire=dectobi(dec)
         binaire="0"*(n-len(binaire)) + binaire
         for i in range(len(binaire)):
-            if binaire[i]=="0":
-                table[dec,i]=0
-            else:
+            if binaire[i]=="1":
                 table[dec,i]=1
     return table
 
