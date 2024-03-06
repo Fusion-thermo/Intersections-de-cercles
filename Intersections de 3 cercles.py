@@ -25,7 +25,7 @@ from Fonctions import *
 
 width=500
 height=width
-unite=50
+unite=150
 x0=width//2
 y0=height//2
 
@@ -40,72 +40,114 @@ def FindSol(table,combi):
     # Indices
     
     model.I = RangeSet(1, n)
-    model.J = RangeSet(1, 2*n)
 
     # Variables
     #dans l'ordre pour chaque cercle
     model.rayons = Var(model.I,bounds=(0.05,10**5),initialize=1.0)
-    model.coos = Var(model.J,within=Reals)
-    model.d= Var(within=NonNegativeIntegers)
+    model.x = Var(model.I,within=Reals)
+    model.y = Var(model.I,within=Reals)
+    model.xp = Var(within=Reals)
+    model.yp = Var(within=Reals)
+    model.d = Var(within=Reals)
 
     #Cercle fixe
-    model.rayons[1] = 1
-    model.coos[1] = 0
-    model.coos[2] = 0
+    model.cercle_fixe=ConstraintList()
+    model.cercle_fixe.add(expr=model.rayons[1] == 1)
+    model.cercle_fixe.add(expr=model.x[1] == 0)
+    model.cercle_fixe.add(expr=model.y[1] == 0)
 
     # Objective Function
     #Rapprocher les centres de 0,0
-    #model.obj = Objective(expr=model.coos[3]**2 + model.coos[4]**2)
+    #model.obj = Objective(expr=model.x[3]**2 + model.y[3]**2)
     #Rayons proches de la moyenne
     #model.obj = Objective(expr=(sum([1,model.rayons[2]])/2 - rayon_moyen)**2)
     #Distance entre cercle proche de la moyenne
     #model.obj = Objective(expr=model.d)
-    #Distance et rayon proche de la moyenne
-    model.obj = Objective(expr= (sum([1,model.rayons[2]])/2 - rayon_moyen)**2 + model.d)
+    #Rayon et distance proches de la moyenne
+    model.obj = Objective(expr= (sum(model.rayons[i] for i in model.I)/n - rayon_moyen)**2 + model.d)
 
     # Equations du système :
     model.system=ConstraintList()
     #Contrainte de distance moyenne qui sert pour l'objectif
-    model.system.add(expr=model.d == sum([model.coos[3]**2 + model.coos[4]**2])/2 - distance_moyenne)
+    model.system.add(expr=model.d == sum(model.x[i]**2 + model.y[i]**2 for i in model.I)/n - distance_moyenne)
 
     #Définir la situation pour chaque paire de cercle
     #solo : si un cercle est présent seul, intersec : si les deux cercles sont en intersection
-    solo1=True
-    solo2=True
-    intersec=True
-    for ligne in range(2**n):
-        if table[ligne,0] == 1 and table[ligne,1] == 0 and combi[ligne] == "0":
-            solo1=False
-        elif table[ligne,0] == 0 and table[ligne,1] == 1 and combi[ligne] == "0":
-            solo2=False
-        elif table[ligne,0] == 1 and table[ligne,1] == 1 and combi[ligne] == "0":
-            intersec=False
+    solo1,solo2,solo3,intersec12,intersec13,intersec23,triple=False,False,False,False,False,False,False
+    if combi[1] == "1":
+        solo1=True
+    if combi[2] == "1":
+        solo2=True
+    if combi[4] == "1":
+        solo3=True
+    if combi[3] == "1":
+        intersec12=True
+    if combi[5] == "1":
+        intersec13=True
+    if combi[6] == "1":
+        intersec23=True
+    if combi[7] == "1":
+        triple=True
+    print(solo1,solo2,solo3,intersec12,intersec13,intersec23,triple)
+        
+    duos=[DuoCercles(1,2,solo1,solo2,solo3,intersec12,intersec13,intersec23),DuoCercles(1,3,solo1,solo3,solo2,intersec13,intersec12,intersec23),DuoCercles(2,3,solo2,solo3,solo1,intersec23,intersec12,intersec13)]
+    model.coosTripleIntersection=ConstraintList()
+    model.coosTripleIntersection.add(expr = model.xp == sum(model.x[i] for i in model.I)/n)
+    model.coosTripleIntersection.add(expr = model.yp == sum(model.y[i] for i in model.I)/n)
 
-    #séparés
-    if solo1 and solo2 and not intersec:
-        model.system.add(expr=1.1*(1 + 2*model.rayons[2] + model.rayons[2]**2) <= model.coos[3]**2 + model.coos[4]**2)
-    #imbriqués (intersection également)
-    elif not (solo1 and solo2) and intersec:
-        model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
-        model.system.add(expr=model.rayons[2] <= 1)
-        model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
-    #intersection simple
-    elif solo1 and solo2 and intersec:
-        model.system.add(expr=1 + 2*model.rayons[2] + model.rayons[2]**2 >= model.coos[3]**2 + model.coos[4]**2)
-        model.system.add(expr=1 - 2*model.rayons[2] + model.rayons[2]**2 <= model.coos[3]**2 + model.coos[4]**2)
-    else:
-        print("Erreur pas de cas trouvé")
+
+    for duo in duos:
+        #séparés s'ils ne sont pas en intersection et qu'il n'y a pas de point triple
+        if not duo.intersection and not triple:
+            #étendu : model.system.add(expr=1.1*(model.rayons[duo.id1]**2 + 2*model.rayons[duo.id1]*model.rayons[duo.id2] + model.rayons[duo.id2]**2) <= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+            model.system.add(expr=1.1*(model.rayons[duo.id1] + model.rayons[duo.id2])**2 <= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+        #en intersection
+        #(intersection et aucun n'existe solo [donc imbriqués dans le troisième]) ou (intersection et ils existent chacun solo)
+        elif (not duo.solo1 and not duo.solo2) or (duo.solo1 and duo.solo2):
+            model.system.add(expr=(model.rayons[duo.id1] + model.rayons[duo.id2])**2 >= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+            model.system.add(expr=(model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2 >= (model.rayons[duo.id1] - model.rayons[duo.id2])**2)
+        #imbriqués
+        #intersection avec seulement l'un des deux qui existe solo
+        elif (duo.solo1 and not duo.solo2) or (not duo.solo1 and duo.solo2):
+            if not duo.solo3:#si le 3è n'est pas solo alors celui de l'intersection actuelle qui n'est pas solo va être imbriqué dans celui qui l'est
+                model.system.add(expr=(model.rayons[duo.id1] + model.rayons[duo.id2])**2 >= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+                if duo.solo1:
+                    model.system.add(expr = model.rayons[duo.id2] <= model.rayons[duo.id1])
+                    model.system.add(expr=(model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2 <= (model.rayons[duo.id1] - model.rayons[duo.id2])**2)
+                else:
+                    model.system.add(expr = model.rayons[duo.id2] >= model.rayons[duo.id1])
+                    model.system.add(expr=(model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2 <= (model.rayons[duo.id2] - model.rayons[duo.id1])**2)
+            elif duo.solo3:#alors celui de l'intersection actuelle qui n'est pas solo va être imbriqué dans celui qui l'est si il n'est pas également en intersection avec le 3è.
+                if duo.solo1:
+                    if not intersec23:
+                        model.system.add(expr=(model.rayons[duo.id1] + model.rayons[duo.id2])**2 >= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+                        model.system.add(expr = model.rayons[duo.id2] <= model.rayons[duo.id1])
+                        model.system.add(expr=(model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2 <= (model.rayons[duo.id1] - model.rayons[duo.id2])**2)
+                else:
+                    if not intersec13:
+                        model.system.add(expr=(model.rayons[duo.id1] + model.rayons[duo.id2])**2 >= (model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2)
+                        model.system.add(expr = model.rayons[duo.id2] >= model.rayons[duo.id1])
+                        model.system.add(expr=(model.x[duo.id1]-model.x[duo.id2])**2 + (model.y[duo.id1]-model.y[duo.id2])**2 <= (model.rayons[duo.id2] - model.rayons[duo.id1])**2)
+        else:
+            print("Erreur pas de cas trouvé")
+    if triple:
+        model.system.add(expr=(model.x[1]-model.xp)**2 + (model.y[1]-model.yp)**2 <= model.rayons[1])
+        model.system.add(expr=(model.x[2]-model.xp)**2 + (model.y[2]-model.yp)**2 <= model.rayons[2])
+        model.system.add(expr=(model.x[3]-model.xp)**2 + (model.y[3]-model.yp)**2 <= model.rayons[3])
+    #et pour forcer le non triple ? seul l'un des trois peut être mis en contrainte inverse à ci-dessus
+
 
     # Solve the model
     SolverFactory('gurobi').solve(model, tee=False, options={"NonConvex":2})
 
-    return Cercle(model.rayons[2](),model.coos[3](),model.coos[4]())
+    return [Cercle(model.rayons[i](),model.x[i](),model.y[i]()) for i in model.I]
 
-"""
-#je commente ça car je ne trouve pas toutes les règles pour réduire les combinaisons (actuellement 28 au lieu de 14)
-#il faut retirer les symétries et situations impossibles
+
 table=table_de_verite(n)
 print(table)
+"""
+#je commente ça car je ne trouve pas toutes les règles pour réduire les combinaisons (actuellement 28 au lieu de 14)
+#il faut retirer les symétries (normalement fait) et situations impossibles (visiblement il manque au moins 1 règle : 28 au lieu de 14)
 
 combinaisons=[]
 for i in range(2**(2**n)):
@@ -180,42 +222,54 @@ for binaire in combinaisons:
 print(len(combinaisons), *combinaisons)
 for i in combinaisons:
     print(i) """
+
 combinaisons=["11101000","11111010","11100010","10001011","10001110","10011111","11111000","11111111","11111110","11110010","11110011","11110001","11110111","11101111"]
 
-# solutions=[]
-# for combi in combinaisons:
-#     solutions.append(FindSol(table,combi))
-# for cercle in solutions:
-#     cercle.valeurs()
+def affichage_suivant():
+    global numero
+    #numero=12
+    Canevas.delete(ALL)
+    cercles=FindSol(table,combinaisons[numero])
+    numeroT.set(str(numero+1))
+    binaire.set(combinaisons[numero])
 
-# def affichage_suivant():
-#     global numero
-#     Canevas.delete(ALL)
-#     cercles=[solutions[numero]]
-#     cercles.append(Cercle(1,0,0))
-#     numero+=1
+    i=0
+    couleurs=["blue","red","green"]
+    for cercle in cercles:
+        cercle.valeurs()
+        #print(cercle.valeurs())
+        Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite,outline=couleurs[i])
+        Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite) #centre
+        i+=1
+    numero+=1
+    print("\n")
+    if numero==len(combinaisons):
+        fenetre.destroy()
 
-#     for cercle in cercles:
-#         #print(cercle.valeurs())
-#         Canevas.create_oval(x0 + (cercle.x - cercle.r)*unite,y0 + (cercle.y - cercle.r)*unite,x0 + (cercle.x + cercle.r)*unite,y0 + (cercle.y + cercle.r)*unite)
-#         Canevas.create_oval(x0 + cercle.x*unite,y0 + cercle.y*unite,x0 + cercle.x *unite,y0 + cercle.y*unite)
 
+fenetre=Tk()
+fenetre.bind('<Escape>',lambda e: fenetre.destroy())
 
-# fenetre=Tk()
-# fenetre.bind('<Escape>',lambda e: fenetre.destroy())
+Canevas = Canvas(fenetre, width=width, height=height)
+Canevas.pack()
 
-# Canevas = Canvas(fenetre, width=width, height=height)
-# Canevas.pack()
+Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
+Bouton1.pack()
 
-# Bouton1 = Button(fenetre, text = 'Quitter', command = fenetre.destroy)
-# Bouton1.pack()
+Bouton_affiche = Button(fenetre, text = 'Suivant', command = affichage_suivant)
+Bouton_affiche.pack()
 
-# Bouton_affiche = Button(fenetre, text = 'Suivant', command = affichage_suivant)
-# Bouton_affiche.pack()
+numeroT=StringVar()
+Label(fenetre,textvariable=numeroT).pack()
+numeroT.set("")
 
-# numero=0
+binaire=StringVar()
+Label(fenetre,textvariable=binaire).pack()
+binaire.set("")
 
-# affichage_suivant()
+numero=0
 
-# fenetre.mainloop()
+affichage_suivant()
+
+fenetre.mainloop()
 

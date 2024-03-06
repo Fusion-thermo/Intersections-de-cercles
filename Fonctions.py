@@ -6,7 +6,7 @@ class Cercle:
         self.x=x
         self.y=y
     def valeurs(self):
-        print(round(self.r,2),round(self.x,2),round(self.y,2))
+        print("R : {} X : {} Y : {}".format(round(self.r,2),round(self.x,2),round(self.y,2)))
 
 #décimal à binaire
 def dectobi(a):
@@ -32,3 +32,13 @@ def table_de_verite(n):
                 table[dec,i]=1
     return table
 
+class DuoCercles:
+    def __init__(self,id1,id2,solo1,solo2,solo3,intersection,intersection13,intersection23):
+        self.id1=id1
+        self.id2=id2
+        self.solo1=solo1
+        self.solo2=solo2
+        self.solo3=solo3
+        self.intersection=intersection
+        self.intersection13=intersection13
+        self.intersection23=intersection23
